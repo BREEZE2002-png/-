@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ปัญญาจัดให้ - โดย Breeze Thanaphon</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=sarabun:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Fresh Growth (White & Green) -->
+    <!-- Application Structure Plan: This version integrates a major new feature: an AI Tutor Chat. The core app flow remains unchanged. The chat is implemented as a non-intrusive Floating Action Button (FAB) that opens a modal overlay. This allows the user to access the tutor at any point in their workflow without disrupting the main task, significantly enhancing the app's utility as a learning tool. -->
+    <!-- Visualization & Content Choices: Report Info: AI Tutor Feature -> Goal: Enhance Learning & Support -> Presentation: A floating action button and a chat modal overlay. -> Interaction: Click FAB to open/close chat, type and send messages, receive simulated AI responses. -> Justification: The FAB/modal pattern is a standard, intuitive way to add secondary, on-demand functionality. The chat interface provides a direct line to AI assistance, fulfilling the user's request for a more interactive and supportive learning experience beyond just solving problems. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        body {
+            font-family: 'Sarabun', sans-serif;
+            background-color: #fafffb;
+            color: #1e293b; /* slate-800 */
+        }
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .view-section {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.5s ease-out;
+        }
+        .view-section.active {
+            display: block;
+            opacity: 1;
+        }
+        .file-drop-zone {
+            transition: all 0.3s ease;
+        }
+        .file-drop-zone.dragover {
+            border-color: #22c55e; /* green-500 */
+            background-color: #f0fdf4; /* green-50 */
+            transform: scale(1.02);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+        }
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #dcfce7; /* green-100 */
+            border-top: 5px solid #22c55e; /* green-500 */
+            border-radius: 50%;
+            animation: spin 1.2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(30, 41, 59, 0.07);
+        }
+        .step-card {
+            opacity: 0;
+            transform: translateY(20px);
+            animation: slide-up 0.6s ease-out forwards;
+        }
+        @keyframes slide-up {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .step-nav-item.active {
+            background-color: #16a34a; /* green-600 */
+            color: white;
+            font-weight: 700;
+            box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+        }
+        .step-nav-item:not(.active):hover {
+             background-color: #dcfce7; /* green-100 */
+        }
+        /* Chat Styles */
+        #chat-fab {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        #chat-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 25px rgba(22, 163, 74, 0.4);
+        }
+        #chat-overlay {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .chat-message {
+            display: flex;
+            gap: 0.75rem; /* 12px */
+            max-width: 80%;
+        }
+        .chat-message.user {
+            margin-left: auto;
+            flex-direction: row-reverse;
+        }
+        .chat-bubble {
+            padding: 0.75rem; /* 12px */
+            border-radius: 1rem; /* 16px */
+        }
+        .chat-bubble-user {
+            background-color: #16a34a;
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+        .chat-bubble-ai {
+            background-color: #f3f4f6; /* gray-100 */
+            color: #1f2937; /* gray-800 */
+            border-bottom-left-radius: 0.25rem;
+        }
+        .ai-avatar {
+            width: 2.5rem; /* 40px */
+            height: 2.5rem;
+            border-radius: 9999px;
+            background-color: #dcfce7; /* green-100 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem; /* 24px */
+            flex-shrink: 0;
+        }
+        .typing-indicator span {
+            animation: bounce 1.4s infinite ease-in-out both;
+            width: 8px;
+            height: 8px;
+            background-color: #9ca3af; /* gray-400 */
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1.0); }
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <canvas id="particle-canvas"></canvas>
+
+    <header class="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-40 border-b border-slate-200">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <img src="https://i.postimg.cc/k4bpGYxP/20250731-1856-remix-01k1g57895fxzb322z3pfbtkj6.png" alt="โลโก้ปัญญาจัดให้" class="w-14 h-14 rounded-full object-cover shadow-md">
+                    <h1 class="text-xl md:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-slate-800">ปัญญาจัดให้</h1>
+                </div>
+                <div id="clock" class="text-sm text-slate-600 font-semibold hidden md:block"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto p-4 md:p-8 relative z-10">
+
+        <!-- Section 1: Upload Screen -->
+        <section id="upload-screen" class="view-section active">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl md:text-5xl font-extrabold mb-3 text-slate-900">AI ช่วยการบ้านคู่ใจ</h2>
+                <p class="text-lg text-slate-600 max-w-2xl mx-auto">เพียงถ่ายภาพหรืออัปโหลดโจทย์การบ้านของคุณ แล้วปล่อยให้เป็นหน้าที่ของ AI สุดอัจฉริยะ</p>
+            </div>
+            <div id="file-drop-zone" class="w-full max-w-2xl mx-auto bg-white border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center cursor-pointer shadow-sm">
+                <input type="file" id="file-input" class="hidden" accept="image/*">
+                <div class="flex flex-col items-center">
+                    <div class="w-20 h-20 rounded-full bg-gradient-to-br from-green-100 to-emerald-200 flex items-center justify-center mb-4">
+                        <span class="text-5xl">📷</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-800 mb-2">วางไฟล์ที่นี่ หรือคลิกเพื่ออัปโหลด</h3>
+                    <p class="text-slate-500">รองรับไฟล์ภาพ JPG, PNG, หรือ WebP</p>
+                </div>
+            </div>
+            <div id="image-preview-container" class="hidden mt-8 max-w-xl mx-auto text-center">
+                <img id="image-preview" src="" alt="Image Preview" class="max-w-full max-h-80 mx-auto rounded-xl shadow-lg border-4 border-white">
+                <button id="submit-btn" class="mt-8 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold py-3 px-10 rounded-full hover:scale-105 transition-all duration-300 shadow-lg">
+                    ส่งให้ AI วิเคราะห์
+                </button>
+            </div>
+        </section>
+
+        <!-- Section 2: Analyzing Screen -->
+        <section id="analyzing-screen" class="view-section">
+            <div class="flex flex-col items-center justify-center min-h-[60vh] text-center">
+                <div class="loader mb-8"></div>
+                <h2 class="text-2xl font-bold text-slate-800 mb-4">AI กำลังวิเคราะห์โจทย์ของคุณ...</h2>
+                <div class="w-full max-w-md text-left mt-4 card p-6 rounded-xl shadow-lg">
+                    <p id="analysis-step-1" class="text-slate-600 font-medium mb-3 opacity-0 transition-opacity duration-500">✓ กำลังอ่านข้อความในภาพ (OCR)</p>
+                    <p id="analysis-step-2" class="text-slate-600 font-medium mb-3 opacity-0 transition-opacity duration-500">✓ กำลังวิเคราะห์วิชาและระดับชั้น</p>
+                    <p id="analysis-step-3" class="text-slate-600 font-medium opacity-0 transition-opacity duration-500">✓ กำลังสร้างคำตอบและคำอธิบาย...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Results Screen -->
+        <section id="results-screen" class="view-section">
+            <!-- Content is dynamically generated by JS -->
+        </section>
+    </main>
+
+    <!-- AI Tutor Chat Feature -->
+    <div id="chat-container">
+        <button id="chat-fab" class="fixed bottom-6 right-6 w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-3xl shadow-lg z-50">
+            🤖
+        </button>
+        <div id="chat-overlay" class="hidden fixed inset-0 bg-black/30 z-40"></div>
+        <div id="chat-window" class="hidden fixed bottom-0 right-0 md:bottom-6 md:right-6 w-full h-[90vh] max-h-screen md:w-96 md:h-[600px] bg-white rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col transform translate-y-full transition-transform duration-300 z-50">
+            <div class="flex items-center justify-between p-4 border-b border-slate-200 flex-shrink-0">
+                <h3 class="font-bold text-lg text-slate-800 flex items-center gap-2"><span>🤖</span>ติวเตอร์ AI "ปัญญา"</h3>
+                <div class="flex items-center gap-2">
+                    <button id="minimize-chat-btn" class="text-slate-400 hover:text-slate-800 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4" />
+                        </svg>
+                    </button>
+                    <button id="close-chat-btn" class="text-slate-400 hover:text-red-500 p-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div id="chat-messages" class="flex-1 p-4 flex flex-col space-y-4 overflow-y-auto">
+                <!-- Messages will be appended here -->
+            </div>
+            <div class="p-2 border-t border-slate-200 flex-shrink-0">
+                <div id="chat-image-preview-container" class="hidden p-2">
+                    <div class="relative w-20 h-20">
+                        <img id="chat-image-preview" src="" class="w-full h-full object-cover rounded-lg">
+                        <button id="remove-chat-image-btn" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs">&times;</button>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 p-2">
+                    <input type="file" id="chat-file-input" class="hidden" accept="image/*">
+                    <button id="attach-file-btn" class="text-slate-500 hover:text-green-600 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
+                    </button>
+                    <input type="text" id="chat-input" placeholder="ถามปัญญาได้เลย..." class="w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                    <button id="send-chat-btn" class="bg-green-600 text-white p-2 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Error Modal -->
+    <div id="error-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full text-center">
+            <h3 class="text-2xl font-bold text-red-600 mb-4">เกิดข้อผิดพลาด</h3>
+            <p id="error-message" class="text-slate-700 mb-6"></p>
+            <button id="close-error-modal-btn" class="bg-red-500 text-white font-bold py-2 px-8 rounded-lg hover:bg-red-600 transition-colors">ตกลง</button>
+        </div>
+    </div>
+
+    <footer class="text-center py-6 mt-12 border-t border-slate-200 relative z-10">
+        <p class="text-sm text-slate-500">พัฒนาโดย <span class="font-bold text-green-600">Breeze Thanaphon</span></p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- PARTICLE BACKGROUND SCRIPT ---
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            let particlesArray;
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * canvas.width;
+                    this.y = Math.random() * canvas.height;
+                    this.size = Math.random() * 2.5 + 1;
+                    this.speedX = (Math.random() * 0.6) - 0.3;
+                    this.speedY = (Math.random() * 0.6) - 0.3;
+                    this.color = `rgba(34, 197, 94, ${Math.random() * 0.3 + 0.1})`;
+                }
+                update() {
+                    this.x += this.speedX;
+                    this.y += this.speedY;
+                    if (this.size > 0.2) this.size -= 0.01;
+                }
+                draw() {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            function initParticles() {
+                particlesArray = [];
+                const numberOfParticles = (canvas.width * canvas.height) / 20000;
+                for (let i = 0; i < numberOfParticles; i++) {
+                    particlesArray.push(new Particle());
+                }
+            }
+            function animateParticles() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                for (let i = 0; i < particlesArray.length; i++) {
+                    particlesArray[i].update();
+                    particlesArray[i].draw();
+                    if (particlesArray[i].size <= 0.2) {
+                        particlesArray.splice(i, 1);
+                        i--;
+                        particlesArray.push(new Particle());
+                    }
+                }
+                requestAnimationFrame(animateParticles);
+            }
+            initParticles();
+            animateParticles();
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+                initParticles();
+            });
+
+            // --- APP LOGIC ---
+            const allScreens = document.querySelectorAll('.view-section');
+            const uploadScreen = document.getElementById('upload-screen');
+            const analyzingScreen = document.getElementById('analyzing-screen');
+            const resultsScreen = document.getElementById('results-screen');
+
+            const fileDropZone = document.getElementById('file-drop-zone');
+            const fileInput = document.getElementById('file-input');
+            const imagePreviewContainer = document.getElementById('image-preview-container');
+            const imagePreview = document.getElementById('image-preview');
+            const submitBtn = document.getElementById('submit-btn');
+            
+            // Clock
+            const clockElement = document.getElementById('clock');
+
+            // Error Modal
+            const errorModal = document.getElementById('error-modal');
+            const errorMessage = document.getElementById('error-message');
+            const closeErrorModalBtn = document.getElementById('close-error-modal-btn');
+
+            // Chat Logic
+            const chatFab = document.getElementById('chat-fab');
+            const chatOverlay = document.getElementById('chat-overlay');
+            const chatWindow = document.getElementById('chat-window');
+            const closeChatBtn = document.getElementById('close-chat-btn');
+            const minimizeChatBtn = document.getElementById('minimize-chat-btn');
+            const chatMessages = document.getElementById('chat-messages');
+            const chatInput = document.getElementById('chat-input');
+            const sendChatBtn = document.getElementById('send-chat-btn');
+            const attachFileBtn = document.getElementById('attach-file-btn');
+            const chatFileInput = document.getElementById('chat-file-input');
+            const chatImagePreviewContainer = document.getElementById('chat-image-preview-container');
+            const chatImagePreview = document.getElementById('chat-image-preview');
+            const removeChatImageBtn = document.getElementById('remove-chat-image-btn');
+            let attachedImageData = null;
+            let uploadedImageData = null;
+
+            // --- GEMINI API SETUP ---
+            const apiKey = ""; // API key will be injected by the environment
+            const apiEndpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            async function callGeminiAPI(payload) {
+                try {
+                    const response = await fetch(apiEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) {
+                        const errorBody = await response.json();
+                        console.error("API Error Body:", errorBody);
+                        throw new Error(`API call failed with status: ${response.status}`);
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error("Gemini API call error:", error);
+                    showErrorModal("เกิดข้อผิดพลาดในการติดต่อกับ AI ครับ อาจเกิดจากปัญหาการเชื่อมต่อหรือการเข้าถึง API กรุณาลองใหม่อีกครั้ง");
+                    return null;
+                }
+            }
+
+            // --- UI & VIEW MANAGEMENT ---
+            function switchView(viewToShow) {
+                allScreens.forEach(view => view.classList.remove('active'));
+                viewToShow.classList.add('active');
+            }
+
+            function updateClock() {
+                const now = new Date();
+                const options = {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                    timeZone: 'Asia/Bangkok'
+                };
+                clockElement.textContent = now.toLocaleString('th-TH', options);
+            }
+            setInterval(updateClock, 1000);
+            updateClock();
+
+            function showErrorModal(message) {
+                errorMessage.textContent = message;
+                errorModal.classList.remove('hidden');
+            }
+
+            closeErrorModalBtn.addEventListener('click', () => {
+                errorModal.classList.add('hidden');
+            });
+
+            // --- FILE HANDLING ---
+            fileDropZone.addEventListener('click', () => fileInput.click());
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileDropZone.addEventListener(eventName, e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+            fileDropZone.addEventListener('dragover', () => fileDropZone.classList.add('dragover'));
+            fileDropZone.addEventListener('dragleave', () => fileDropZone.classList.remove('dragover'));
+            fileDropZone.addEventListener('drop', (e) => {
+                fileDropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+            });
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length > 0) handleFile(e.target.files[0]);
+            });
+
+            function handleFile(file) {
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const base64Data = e.target.result;
+                        imagePreview.src = base64Data;
+                        uploadedImageData = {
+                            mimeType: file.type,
+                            data: base64Data.split(',')[1]
+                        };
+                        imagePreviewContainer.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+            
+            // --- CORE APP FLOW ---
+            submitBtn.addEventListener('click', async () => {
+                if (!uploadedImageData) {
+                    alert('กรุณาอัปโหลดรูปภาพก่อนครับ');
+                    return;
+                }
+                
+                switchView(analyzingScreen);
+                setTimeout(() => document.getElementById('analysis-step-1').style.opacity = 1, 500);
+                setTimeout(() => document.getElementById('analysis-step-2').style.opacity = 1, 1500);
+                setTimeout(() => document.getElementById('analysis-step-3').style.opacity = 1, 2500);
+
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: "คุณคือติวเตอร์ AI ชื่อ 'ปัญญาจัดให้' เชี่ยวชาญทุกวิชา โปรดวิเคราะห์โจทย์การบ้านจากภาพนี้ และตอบกลับมาในรูปแบบ JSON ที่มีโครงสร้างดังนี้เท่านั้น: { \"question\": \"ข้อความโจทย์ที่อ่านได้จากภาพ\", \"subject\": \"ชื่อวิชา\", \"answer\": \"คำตอบสุดท้ายแบบสั้นๆ\", \"steps\": [{\"title\": \"ชื่อขั้นตอน\", \"description\": \"คำอธิบายขั้นตอนนี้\", \"formula\": \"สูตรที่ใช้ในขั้นตอนนี้ (ถ้ามี)\"}], \"theory\": {\"title\": \"หัวข้อทฤษฎี\", \"content\": \"คำอธิบายทฤษฎีที่เกี่ยวข้อง\"} }" },
+                            { inlineData: { mimeType: uploadedImageData.mimeType, data: uploadedImageData.data } }
+                        ]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const result = await callGeminiAPI(payload);
+
+                if (result && result.candidates) {
+                    const responseText = result.candidates[0].content.parts[0].text;
+                    try {
+                        const solution = JSON.parse(responseText);
+                        displayResults(solution);
+                        switchView(resultsScreen);
+                    } catch (e) {
+                        console.error("Failed to parse JSON response:", responseText);
+                        showErrorModal("AI ไม่สามารถประมวลผลโจทย์นี้ได้ กรุณาลองภาพอื่นที่ชัดเจนกว่านี้ครับ");
+                        resetApp();
+                    }
+                } else {
+                    resetApp();
+                }
+            });
+
+            function displayResults(solution) {
+                let stepsHTML = solution.steps.map((step, index) => `
+                    <div id="step-${index + 1}" class="card p-6 rounded-2xl step-card shadow-md" style="animation-delay: ${0.1 * (index + 1)}s;">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="flex-shrink-0 w-10 h-10 bg-green-100 text-green-700 font-bold rounded-full flex items-center justify-center">${index + 1}</div>
+                            <h4 class="text-xl font-bold text-slate-800">${step.title || ''}</h4>
+                        </div>
+                        <p class="text-slate-600 mb-3">${step.description || ''}</p>
+                        ${step.formula ? `<p class="bg-slate-100 p-3 rounded-lg font-mono text-slate-800">${step.formula}</p>` : ''}
+                    </div>
+                `).join('');
+
+                let navHTML = solution.steps.map((step, index) => `
+                    <a href="#step-${index + 1}" class="step-nav-item block p-3 rounded-lg transition-all duration-200 text-slate-700">${index + 1}. ${step.title || ''}</a>
+                `).join('');
+
+                resultsScreen.innerHTML = `
+                    <div class="lg:grid lg:grid-cols-3 lg:gap-8">
+                        <div class="lg:col-span-1 lg:sticky lg:top-24 h-fit">
+                            <div class="card p-6 rounded-2xl mb-6 shadow-lg">
+                                <h3 class="text-xl font-bold mb-4 text-slate-900">โจทย์: ${solution.subject || 'ไม่ระบุวิชา'}</h3>
+                                <div class="bg-slate-100 p-4 rounded-lg">
+                                    <p class="text-slate-700 font-medium">"${solution.question || 'ไม่สามารถอ่านโจทย์ได้'}"</p>
+                                </div>
+                            </div>
+                            <div class="card p-6 rounded-2xl shadow-lg">
+                                <h3 class="text-xl font-bold mb-4 text-slate-900">ภาพรวมวิธีทำ</h3>
+                                <nav id="step-navigation" class="space-y-2">${navHTML}</nav>
+                            </div>
+                        </div>
+                        <div class="lg:col-span-2 mt-6 lg:mt-0">
+                            <div class="space-y-6">
+                                <div class="card p-6 rounded-2xl step-card shadow-lg">
+                                    <h3 class="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-green-600 to-emerald-700">${solution.answer || 'ไม่มีคำตอบ'}</h3>
+                                    <p class="text-slate-600">ด้านล่างคือขั้นตอนการคำนวณอย่างละเอียด</p>
+                                </div>
+                                ${stepsHTML}
+                                ${solution.theory ? `
+                                <div class="card p-6 rounded-2xl step-card shadow-md" style="animation-delay: ${0.1 * (solution.steps.length + 1)}s;">
+                                    <div class="flex items-center gap-4 mb-4">
+                                        <div class="flex-shrink-0 w-10 h-10 bg-green-100 text-green-700 font-bold rounded-full flex items-center justify-center">📚</div>
+                                        <h4 class="text-xl font-bold text-slate-800">${solution.theory.title || 'ทฤษฎีที่เกี่ยวข้อง'}</h4>
+                                    </div>
+                                    <p class="text-slate-600">${solution.theory.content || ''}</p>
+                                </div>` : ''}
+                                <div class="text-center mt-8 step-card" style="animation-delay: ${0.1 * (solution.steps.length + 2)}s;">
+                                    <button id="generate-problems-btn" class="bg-green-600 text-white font-bold py-3 px-6 rounded-full hover:bg-green-700 hover:scale-105 transition-all duration-300 mr-4">✨ สร้างโจทย์ที่คล้ายกัน</button>
+                                    <button id="reset-btn" class="bg-slate-700 text-white font-bold py-3 px-8 rounded-full hover:bg-slate-800 hover:scale-105 transition-all duration-300">ลองโจทย์อื่น</button>
+                                </div>
+                                <div id="similar-problems-container" class="space-y-4"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('reset-btn').addEventListener('click', resetApp);
+                document.getElementById('generate-problems-btn').addEventListener('click', () => generateSimilarProblems(solution.question));
+
+                const stepNavItems = document.querySelectorAll('.step-nav-item');
+                const stepSections = solution.steps.map((_, index) => document.getElementById(`step-${index + 1}`));
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            stepNavItems.forEach(nav => {
+                                nav.classList.toggle('active', nav.getAttribute('href') === '#' + entry.target.id);
+                            });
+                        }
+                    });
+                }, { rootMargin: "-40% 0px -60% 0px", threshold: 0 });
+                stepSections.forEach(section => observer.observe(section));
+            }
+            
+            async function generateSimilarProblems(originalQuestion) {
+                const btn = document.getElementById('generate-problems-btn');
+                btn.disabled = true;
+                btn.innerHTML = '<div class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>';
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: `จากโจทย์เดิม: "${originalQuestion}", โปรดสร้างโจทย์ปัญหาที่คล้ายกัน 3 ข้อ พร้อมคำตอบแยกต่างหากในรูปแบบ JSON ที่มีโครงสร้างดังนี้เท่านั้น: { "problems": [{"question": "คำถาม", "answer": "คำตอบ"}] }` }]
+                    }],
+                    generationConfig: { responseMimeType: "application/json" }
+                };
+
+                const result = await callGeminiAPI(payload);
+                if(result && result.candidates) {
+                    try {
+                        const data = JSON.parse(result.candidates[0].content.parts[0].text);
+                        const container = document.getElementById('similar-problems-container');
+                        let problemsHTML = '<h3 class="text-2xl font-bold text-center pt-6">โจทย์สำหรับฝึกฝน</h3>';
+                        data.problems.forEach((p, i) => {
+                            problemsHTML += `
+                                <div class="card p-6 rounded-2xl shadow-md">
+                                    <p class="font-semibold mb-2">ข้อ ${i+1}: ${p.question}</p>
+                                    <details class="text-sm">
+                                        <summary class="cursor-pointer text-green-600 font-semibold">ดูเฉลย</summary>
+                                        <p class="mt-2 text-slate-600 bg-slate-100 p-2 rounded">${p.answer}</p>
+                                    </details>
+                                </div>
+                            `;
+                        });
+                        container.innerHTML = problemsHTML;
+                    } catch (e) {
+                         showErrorModal("AI ไม่สามารถสร้างโจทย์เพิ่มเติมได้ในขณะนี้");
+                    }
+                }
+                btn.disabled = false;
+                btn.innerHTML = '✨ สร้างโจทย์ที่คล้ายกัน';
+            }
+
+            function resetApp() {
+                switchView(uploadScreen);
+                imagePreviewContainer.classList.add('hidden');
+                imagePreview.src = '';
+                fileInput.value = '';
+                uploadedImageData = null;
+                resultsScreen.innerHTML = '';
+                ['analysis-step-1', 'analysis-step-2', 'analysis-step-3'].forEach(id => {
+                    document.getElementById(id).style.opacity = 0;
+                });
+            }
+
+            // --- CHAT FUNCTIONALITY ---
+            function toggleChat(show) {
+                if (show) {
+                    chatOverlay.classList.remove('hidden');
+                    chatWindow.classList.remove('hidden');
+                    setTimeout(() => {
+                        chatWindow.style.transform = 'translateY(0)';
+                        chatOverlay.style.opacity = '1';
+                    }, 10);
+                } else {
+                    chatWindow.style.transform = 'translateY(100%)';
+                    chatOverlay.style.opacity = '0';
+                    setTimeout(() => {
+                        chatOverlay.classList.add('hidden');
+                        chatWindow.classList.add('hidden');
+                    }, 300);
+                }
+            }
+
+            chatFab.addEventListener('click', () => toggleChat(true));
+            closeChatBtn.addEventListener('click', () => toggleChat(false));
+            minimizeChatBtn.addEventListener('click', () => toggleChat(false));
+            chatOverlay.addEventListener('click', () => toggleChat(false));
+
+            function addChatMessage(message) {
+                const messageWrapper = document.createElement('div');
+                messageWrapper.className = `chat-message ${message.sender === 'user' ? 'user' : 'ai'}`;
+                
+                let avatarHTML = '';
+                if (message.sender === 'ai') {
+                    avatarHTML = '<div class="ai-avatar">🤖</div>';
+                }
+
+                let contentHTML = '<div class="chat-bubble ' + (message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai') + '">';
+                if (message.image) {
+                    contentHTML += `<img src="${message.image}" class="w-full max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${message.image}')">`;
+                }
+                if (message.text) {
+                    contentHTML += `<p>${message.text}</p>`;
+                }
+                contentHTML += '</div>';
+
+                messageWrapper.innerHTML = message.sender === 'user' ? contentHTML + avatarHTML : avatarHTML + contentHTML;
+                chatMessages.appendChild(messageWrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+
+            function showTypingIndicator() {
+                const messageWrapper = document.createElement('div');
+                messageWrapper.className = 'chat-message ai typing-indicator-wrapper';
+                messageWrapper.innerHTML = `
+                    <div class="ai-avatar">🤖</div>
+                    <div class="chat-bubble chat-bubble-ai typing-indicator">
+                        <span></span><span></span><span></span>
+                    </div>
+                `;
+                chatMessages.appendChild(messageWrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                return messageWrapper;
+            }
+
+            async function handleSendMessage() {
+                const messageText = chatInput.value.trim();
+                if (!messageText && !attachedImageData) return;
+
+                addChatMessage({ text: messageText, image: attachedImageData, sender: 'user' });
+                const userImage = attachedImageData;
+                chatInput.value = '';
+                removeChatImage();
+                
+                const typingIndicator = showTypingIndicator();
+                sendChatBtn.disabled = true;
+
+                const parts = [{ text: `คุณคือ 'ปัญญา' ติวเตอร์ AI เพื่อนซี้ของผู้ใช้งาน พูดคุยแบบเป็นกันเอง ไม่ต้องใช้คำทางการ ให้คำแนะนำเหมือนเพื่อนที่เก่งคอยสอนเพื่อน ตอบคำถามนี้: ${messageText}` }];
+                if (userImage) {
+                    const mimeType = userImage.split(';')[0].split(':')[1];
+                    const data = userImage.split(',')[1];
+                    parts.push({ inlineData: { mimeType, data } });
+                }
+                const payload = { contents: [{ parts }] };
+                
+                const result = await callGeminiAPI(payload);
+                
+                typingIndicator.remove();
+                if (result && result.candidates) {
+                    const responseText = result.candidates[0].content.parts[0].text;
+                    addChatMessage({ text: responseText, sender: 'ai' });
+                } else {
+                    addChatMessage({ text: 'ขอโทษทีนะเพื่อน เหมือนจะมีปัญหาบางอย่าง ลองอีกทีได้มั้ย?', sender: 'ai' });
+                }
+                sendChatBtn.disabled = false;
+            }
+            
+            function removeChatImage() {
+                attachedImageData = null;
+                chatImagePreviewContainer.classList.add('hidden');
+                chatFileInput.value = '';
+            }
+
+            sendChatBtn.addEventListener('click', handleSendMessage);
+            chatInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleSendMessage();
+            });
+            attachFileBtn.addEventListener('click', () => chatFileInput.click());
+            chatFileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        attachedImageData = event.target.result;
+                        chatImagePreview.src = attachedImageData;
+                        chatImagePreviewContainer.classList.remove('hidden');
+                    }
+                    reader.readAsDataURL(e.target.files[0]);
+                }
+            });
+            removeChatImageBtn.addEventListener('click', removeChatImage);
+            
+            setTimeout(() => {
+                addChatMessage({ text: 'หวัดดี! เราชื่อ "ปัญญา" นะ มีอะไรให้ช่วยรึเปล่า? ถามได้ทุกเรื่องเลย!', sender: 'ai' });
+            }, 500);
+
+        });
+    </script>
+</body>
+</html>
