@@ -669,16 +669,28 @@
                     avatarHTML = `<div class="ai-avatar"><img src="https://i.postimg.cc/k4bpGYxP/20250731-1856-remix-01k1g57895fxzb322z3pfbtkj6.png" class="w-full h-full object-cover rounded-full"></div>`;
                 }
 
-                let contentHTML = '<div class="chat-bubble ' + (message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai') + '">';
+                let contentWrapper = document.createElement('div');
+                contentWrapper.className = 'flex flex-col ' + (message.sender === 'user' ? 'items-end' : 'items-start');
+
+                let bubbleHTML = '<div class="chat-bubble ' + (message.sender === 'user' ? 'chat-bubble-user' : 'chat-bubble-ai') + '">';
                 if (message.image) {
-                    contentHTML += `<img src="${message.image}" class="w-full max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${message.image}')">`;
+                    bubbleHTML += `<img src="${message.image}" class="w-full max-w-xs rounded-lg mb-2 cursor-pointer" onclick="window.open('${message.image}')">`;
                 }
                 if (message.text) {
-                    contentHTML += `<p>${message.text}</p>`;
+                    bubbleHTML += `<p>${message.text}</p>`;
                 }
-                contentHTML += '</div>';
+                bubbleHTML += '</div>';
 
-                messageWrapper.innerHTML = message.sender === 'user' ? contentHTML + avatarHTML : avatarHTML + contentHTML;
+                const timestamp = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+                const timestampHTML = `<div class="text-xs text-slate-400 mt-1 px-2">${timestamp}</div>`;
+
+                contentWrapper.innerHTML = bubbleHTML + timestampHTML;
+
+                if (message.sender === 'ai') {
+                    messageWrapper.innerHTML = avatarHTML;
+                }
+                messageWrapper.appendChild(contentWrapper);
+                
                 chatMessages.appendChild(messageWrapper);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
             }
@@ -688,8 +700,10 @@
                 messageWrapper.className = 'chat-message ai typing-indicator-wrapper';
                 messageWrapper.innerHTML = `
                     <div class="ai-avatar"><img src="https://i.postimg.cc/k4bpGYxP/20250731-1856-remix-01k1g57895fxzb322z3pfbtkj6.png" class="w-full h-full object-cover rounded-full"></div>
-                    <div class="chat-bubble chat-bubble-ai typing-indicator">
-                        <span></span><span></span><span></span>
+                    <div class="flex flex-col items-start">
+                        <div class="chat-bubble chat-bubble-ai typing-indicator">
+                            <span></span><span></span><span></span>
+                        </div>
                     </div>
                 `;
                 chatMessages.appendChild(messageWrapper);
@@ -709,7 +723,7 @@
                 const typingIndicator = showTypingIndicator();
                 sendChatBtn.disabled = true;
 
-                const parts = [{ text: `คุณคือ 'ปัญญา' ติวเตอร์ AI เพื่อนซี้ของผู้ใช้งาน พูดคุยแบบเป็นกันเอง ไม่ต้องใช้คำทางการ ให้คำแนะนำเหมือนเพื่อนที่เก่งคอยสอนเพื่อน ตอบคำถามนี้: ${messageText}` }];
+                const parts = [{ text: `คุณคือ 'ปัญญา' ติวเตอร์ AI เพื่อนซี้ของผู้ใช้งาน พูดคุยแบบเป็นกันเอง ไม่ต้องใช้คำทางการ ให้คำแนะนำเหมือนเพื่อนที่เก่งคoyสอนเพื่อน ตอบคำถามนี้: ${messageText}` }];
                 if (userImage) {
                     const mimeType = userImage.split(';')[0].split(':')[1];
                     const data = userImage.split(',')[1];
