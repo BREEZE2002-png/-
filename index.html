@@ -401,36 +401,20 @@
 
             function updateClock() {
                 const now = new Date();
-                let options;
-                 if (window.innerWidth < 768) {
-                    // Shorter format for mobile
-                    options = {
-                        year: 'numeric',
-                        month: 'numeric',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        timeZone: 'Asia/Bangkok'
-                    };
-                    clockElement.textContent = now.toLocaleString('th-TH', options).replace(',', ' ');
-                } else {
-                    // Full format for desktop
-                    options = {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        second: '2-digit',
-                        hour12: false,
-                        timeZone: 'Asia/Bangkok'
-                    };
-                    clockElement.textContent = now.toLocaleString('th-TH', options);
-                }
+                const options = {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                    timeZone: 'Asia/Bangkok'
+                };
+                clockElement.textContent = now.toLocaleString('th-TH', options);
             }
             setInterval(updateClock, 1000);
-            window.addEventListener('resize', updateClock);
             updateClock();
 
             function showErrorModal(message) {
